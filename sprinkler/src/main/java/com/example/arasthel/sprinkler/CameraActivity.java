@@ -14,12 +14,22 @@ import android.view.Window;
 
 import com.example.arasthel.sprinkler.mp4.MP4Config;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.DatagramSocketImpl;
+import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.SocketException;
+import java.nio.Buffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -31,7 +41,7 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
     List<Camera.Size> previewSizes;
 
-    Socket socket;
+    DatagramSocket socket;
 
     MediaRecorder mediaRecorder;
 
@@ -49,9 +59,11 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
     private byte[] header = new byte[5];
 
-    private byte[] buffer = new byte[1024*100];
+    private byte[] buffer;
 
     private int naluLength;
+
+    private FileOutputStream fos;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,13 +90,9 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         mediaRecorder = new MediaRecorder();
 
         configureMediaRecorder();
-        mediaRecorder.setOutputFile(TEST_FILE_PATH);
-
 
 
         //mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_LOW));
-
-        cameraSurface.getHolder().addCallback(this);
 
         Log.d("SIZE", cameraSize.width+"x"+cameraSize.height);
 
@@ -100,10 +108,10 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 
         mediaRecorder.setVideoSize(1280, 720);
-        mediaRecorder.setVideoFrameRate(30);
+        mediaRecorder.setVideoFrameRate(60);
 
-        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H263);
     }
 
     private class ControlThread extends Thread {
@@ -111,16 +119,8 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         public void run() {
             super.run();
             try {
-                Thread.sleep(3000);
-                mediaRecorder.stop();
-                camera.lock();
-                //mediaRecorder.release();
-                MP4Config config = new MP4Config(TEST_FILE_PATH);
-                pps = config.getB64PPS();
-                sps = config.getB64SPS();
-                profile = config.getProfileLevel();
-
-                //socket = new Socket("192.168.1.128", 8081);
+                socket = new DatagramSocket();
+                socket.connect(InetAddress.getByName("192.168.1.130"), 8080);
 
                 long lastPass = 0;
 
@@ -144,22 +144,24 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
                     Log.d("Splitter", "Connection accepted");
                 }*/
 
-                new StreamingThread().start();
-
                 running = true;
 
-                /*while(!socket.isClosed()) {
-                    if((System.currentTimeMillis()) - lastPass  > 3000) {
+                new StreamingThread().start();
+
+                /*DatagramPacket ppsPacket = new DatagramPacket(pps.getBytes(), pps.length());
+                DatagramPacket spsPacket = new DatagramPacket(sps.getBytes(), sps.length());
+
+                while(running) {
+                    if((System.currentTimeMillis()) - lastPass >= 3000) {
                         lastPass = System.currentTimeMillis();
-                        socket.getOutputStream().write(pps.getBytes());
-                        socket.getOutputStream().write(sps.getBytes());
+                        Log.d("SPS", "SPS & PPS sent");
+                        socket.send(ppsPacket);
+                        socket.send(spsPacket);
+                        fos.write(pps.getBytes());
+                        fos.write(sps.getBytes());
                     }
                 }*/
 
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (NoSuchAlgorithmException e) {
@@ -174,48 +176,64 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         public void run() {
             super.run();
             try {
-
                 ParcelFileDescriptor[] descriptors = ParcelFileDescriptor.createPipe();
                 parcelRead = new ParcelFileDescriptor(descriptors[0]);
                 parcelWrite = new ParcelFileDescriptor(descriptors[1]);
 
-                cameraSurface.getHolder().addCallback(CameraActivity.this);
-
-                camera.unlock();
-                configureMediaRecorder();
                 mediaRecorder.setOutputFile(parcelWrite.getFileDescriptor());
-                mediaRecorder.setPreviewDisplay(cameraSurface.getHolder().getSurface());
-                mediaRecorder.prepare();
-                mediaRecorder.start();
+
+                cameraSurface.getHolder().addCallback(CameraActivity.this);
 
                 is = new ParcelFileDescriptor.AutoCloseInputStream(parcelRead);
 
                 // This will skip the MPEG4 header if this step fails we can't stream anything :(
+
+                byte[] mpegHeader = {'m', 'd', 'a', 't'};
+                byte[] headerBuffer = new byte[mpegHeader.length];
                 try {
-                    byte buffer[] = new byte[4];
+                    byte mpegHeaderBuffer[] = new byte[4];
                     // Skip all atoms preceding mdat atom
-                    while (!Thread.interrupted()) {
-                        while (is.read() != 'm');
-                        is.read(buffer,0,3);
-                        if (buffer[0] == 'd' && buffer[1] == 'a' && buffer[2] == 't') break;
-                    }
+                    do {
+                        is.read(headerBuffer);
+                    } while(!Arrays.equals(mpegHeader, headerBuffer));
                 } catch (IOException e) {
                     Log.e("ERROR","Couldn't skip mp4 header :/");
                     throw e;
                 }
 
+                Log.d("SPRINKLER", "MPEG HEADER SKIPPED");
+
                 int read = 0;
 
-                do {
+                DatagramPacket packet;
+
+                /*do {
                     // Read NALU header
                     fill(header, 0, 5);
                     naluLength = header[3]&0xFF | (header[2]&0xFF)<<8 | (header[1]&0xFF)<<16 | (header[0]&0xFF)<<24;
                     Log.d("NALU", "LENGTH: "+naluLength);
                     if (naluLength>100000 || naluLength<0) resync();
-                    read = fill(buffer, 0, naluLength-1);
-                    //socket.getOutputStream().write(buffer);
 
-                } while(read > 0);
+                    buffer = new byte[5+naluLength];
+                    for(int i = 0; i < 5; i++) {
+                        buffer[i] = header[i];
+                    }
+                    read = fill(buffer, 5, naluLength-1);
+                    packet = new DatagramPacket(buffer, buffer.length);
+                    fos.write(buffer);
+                    socket.send(packet);
+
+                } while(read > 0);*/
+
+                do {
+                    // Read H263 chuncks
+                    buffer = new byte[1024*10];
+                    read = fill(buffer, 0, buffer.length);
+                    packet = new DatagramPacket(buffer, buffer.length);
+                    //fos.write(buffer);
+                    socket.send(packet);
+                    Log.d("SPRINKLER", "Sent chunk of "+read+" bytes");
+                } while(running);
 
                 parcelRead.close();
                 parcelWrite.close();
