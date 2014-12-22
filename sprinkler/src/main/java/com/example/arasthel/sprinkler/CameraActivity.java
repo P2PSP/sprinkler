@@ -2,6 +2,7 @@ package com.example.arasthel.sprinkler;
 
 import android.app.Activity;
 import android.hardware.Camera;
+import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.net.LocalSocket;
 import android.os.Bundle;
@@ -103,14 +104,19 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
     private void configureMediaRecorder() {
         mediaRecorder.setCamera(camera);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
+        //mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
 
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 
-        mediaRecorder.setVideoSize(1280, 720);
-        mediaRecorder.setVideoFrameRate(60);
 
-        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+        mediaRecorder.setVideoSize(1280, 720);
+        mediaRecorder.setVideoEncodingBitRate(17000000);
+        mediaRecorder.setVideoFrameRate(30);
+
+        //CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
+
+
+        //mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H263);
     }
 
@@ -120,7 +126,7 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
             super.run();
             try {
                 socket = new DatagramSocket();
-                socket.connect(InetAddress.getByName("192.168.1.130"), 8080);
+                socket.connect(InetAddress.getByName("192.168.10.169"), 8080);
 
                 long lastPass = 0;
 
@@ -227,12 +233,12 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
                 do {
                     // Read H263 chuncks
-                    buffer = new byte[1024*10];
+                    buffer = new byte[256];
                     read = fill(buffer, 0, buffer.length);
                     packet = new DatagramPacket(buffer, buffer.length);
                     //fos.write(buffer);
                     socket.send(packet);
-                    Log.d("SPRINKLER", "Sent chunk of "+read+" bytes");
+                    //Log.d("SPRINKLER", "Sent chunk of "+read+" bytes");
                 } while(running);
 
                 parcelRead.close();
