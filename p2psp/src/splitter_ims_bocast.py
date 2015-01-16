@@ -29,10 +29,6 @@ class Splitter_IMS(threading.Thread):
     # }}}
     BUFFER_SIZE = 256
 
-    # {{{ Channel served by the streaming source.
-    # }}}
-    CHANNEL = "Big_Buck_Bunny_small.ogv"
-
     # {{{ The chunk_size (in bytes) depends mainly on the network
     # technology and should be selected as big as possible, depending
     # on the MTU and the bit-error rate.
@@ -43,25 +39,9 @@ class Splitter_IMS(threading.Thread):
     # }}}
     HEADER_SIZE = 10
 
-    # {{{ The unicast IP address of the splitter server.
-    # }}}
-    #SPLITTER_ADDR = "127.0.0.1" # No por ahora
-
-    # {{{ Port used to serve the peers (listening port).
-    # }}}
-    PORT = 4552
-
     # {{{ The host where the streaming server is running.
     # }}}
     SOURCE_ADDR = "127.0.0.1"
-
-    # {{{ Port where the streaming server is listening.
-    # }}}
-    SOURCE_PORT = 8000
-
-    # {{{ Port where the splitter is listening a new source stream.
-    # }}}
-    SOURCE_PORT_IN = 8080
 
     # {{{ A password is required to send a stream to the splitter.
     # Default password: hackme (MD5)
@@ -75,8 +55,6 @@ class Splitter_IMS(threading.Thread):
 
     # }}}
 
-    videoFile = None
-
     def __init__(self):
         # {{{
 
@@ -85,14 +63,9 @@ class Splitter_IMS(threading.Thread):
         self.print_the_module_name()
         print("Buffer size (in chunks) =", self.BUFFER_SIZE)
         print("Chunk size (in bytes) =", self.CHUNK_SIZE)
-        print("Channel =", self.CHANNEL)
         print("Header size (in chunks) =", self.HEADER_SIZE)
         #print("Splitter address =", self.SPLITTER_ADDR) # No ahora
-        print("Listening (and multicast) port =", self.PORT)
-        print("Source IP address =", self.SOURCE_ADDR)
-        print("Source port =", self.SOURCE_PORT)
         print("Multicast address =", self.MCAST_ADDR)
-        print("Source port in =", self.SOURCE_PORT_IN)
 
         # {{{ An IMS splitter runs 2 threads. The main one serves the
         # chunks to the team. The other controls peer arrivals. This
@@ -112,39 +85,33 @@ class Splitter_IMS(threading.Thread):
         # }}}
         self.team_socket = ""
 
-        # {{{ Used to talk to the source (streaming server HTTP)
-        # }}}
-        self.source_socket = ""
-
         # {{{ The change is automatic (do not touch)
         #    mode = 0 to streaming server
         #    mode = 1 to listen a streaming
         # }}}
         self.mode = 0
 
-        # {{{ Used to receive a stream from the source (via socket TCP)
-        # }}}
-        self.source_socket_in = ""
-
+        self.port = 0
+        
         # {{{ The video header.
         # }}}
         self.header = ""
 
         # {{{ Some other useful definitions.
         # }}}
-        self.source = (self.SOURCE_ADDR, self.SOURCE_PORT)
-        self.GET_message = 'GET /' + self.CHANNEL + ' HTTP/1.1\r\n'
-        self.GET_message += '\r\n'
+        self.source = None
         self.chunk_number_format = "H"
-        self.mcast_channel = (self.MCAST_ADDR, self.PORT)
+        self.mcast_channel = (self.MCAST_ADDR, self.port)
 
         self.recvfrom_counter = 0
         self.sendto_counter = 0
 
         self.header_load_counter = 0
 
-
         # }}}
+
+    def set_source(self, source_file):
+        self.source = source_file
 
     def print_the_module_name(self):
         # {{{
@@ -196,8 +163,8 @@ class Splitter_IMS(threading.Thread):
         # {{{
 
         if __debug__:
-            print("Communicating the multicast channel", (self.MCAST_ADDR, self.PORT))
-        message = struct.pack("4sH", socket.inet_aton(self.MCAST_ADDR), socket.htons(self.PORT))
+            print("Communicating the multicast channel", (self.MCAST_ADDR, self.port))
+        message = struct.pack("4sH", socket.inet_aton(self.MCAST_ADDR), socket.htons(self.port))
         try:
             peer_serve_socket.sendall(message)
         except:
@@ -264,8 +231,8 @@ class Splitter_IMS(threading.Thread):
             pass
 
         try:
-            #self.peer_connection_socket.bind((socket.gethostname(), self.PORT))
-            self.peer_connection_socket.bind(('', self.PORT))
+            # Bind to an available port
+            self.peer_connection_socket.bind(('', self.port))
         except: # Falta averiguar excepcion
             raise
 
@@ -289,25 +256,12 @@ class Splitter_IMS(threading.Thread):
             pass
         try:
             #self.team_socket.bind((socket.gethostname(), self.PORT))
-            self.team_socket.bind(('', self.PORT))
+            self.team_socket.bind(('', self.port))
         except:
             raise
 
         # }}}
 
-    def request_the_video_from_the_source(self):
-        # {{{ Request the video using HTTP from the source node (Icecast).
-
-        self.source_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if __debug__:
-            print(self.source_socket.getsockname(), 'connecting to the source', self.source, '...')
-        self.source_socket.connect(self.source)
-        if __debug__:
-            print(self.source_socket.getsockname(), 'connected to', self.source)
-        self.source_socket.sendall(self.GET_message)
-        _print_(self.source_socket.getsockname(), 'GET_message =', self.GET_message)
-
-        # }}}
 
     def configure_sockets(self):
         # {{{ setup_peer_connection_socket()
@@ -316,9 +270,10 @@ class Splitter_IMS(threading.Thread):
             self.setup_peer_connection_socket()
         except Exception, e:
             print(e)
-            print(self.peer_connection_socket.getsockname(), "\b: unable to bind the port ", self.PORT)
+            print(self.peer_connection_socket.getsockname(), "\b: unable to bind the port ", self.port)
             sys.exit('')
 
+        self.port = self.peer_connection_socket.getsockname()[1]
         # }}}
 
         # {{{ setup_team_socket()
@@ -327,7 +282,7 @@ class Splitter_IMS(threading.Thread):
             self.setup_team_socket()
         except Exception, e:
             print(e)
-            print(self.team_socket.getsockname(), "\b: unable to bind", (socket.gethostname(), self.PORT))
+            print(self.team_socket.getsockname(), "\b: unable to bind", (socket.gethostname(), self.port))
             sys.exit('')
 
         # }}}
@@ -336,58 +291,29 @@ class Splitter_IMS(threading.Thread):
         # {{{ Load the video header.
 
         for i in xrange(self.HEADER_SIZE):
-            self.header += self.receive_next_chunk()
+            self.header += self.read_next_chunk()
 
         # }}}
 
-    def receive_next_chunk(self):
+    def read_next_chunk(self):
         # {{{
 
-        chunk = self.source_socket.recv(self.CHUNK_SIZE)
+        chunk = self.source.read(self.CHUNK_SIZE)
 
-        prev_size = 0
-        while len(chunk) < self.CHUNK_SIZE:
-            if len(chunk) == prev_size:
-                # This section of code is reached when the source streaming
-                # server or source via socket finishes a stream and starts with
-                # the following one.
-                if len(chunk) != 0:
-                    return chunk
+        read_count = len(chunk)
 
-                print("No data in the server!")
-
-                if (self.mode == 0):
-                    print ("Reload stream from streaming server")
-                    sys.stdout.flush()
-                    self.mode = 0
-                    self.source_socket.close()
-                    time.sleep(1)
-                    self.source_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    self.source_socket.connect(self.source)
-                    self.source_socket.sendall(self.GET_message)
-                else:
-                    print ("Stream from socket")
-                    self.mode = 0
-                    self.source_socket_in.sendall(self.SOURCE_PASS)
-                    self.source_socket = self.source_socket_in
-
-                self.header = ""
-                self.header_load_counter = self.HEADER_SIZE
-                chunk = ""
-
-                #_print_("1: header_load_counter =", self.header_load_counter)
-
-            prev_size = len(chunk)
-            chunk += self.source_socket.recv(self.CHUNK_SIZE - len(chunk))
+        while read_count < self.CHUNK_SIZE:
+            chunk += self.source.read(self.CHUNK_SIZE - read_count)
+            read_count = len(chunk)
 
         return chunk
 
         # }}}
 
-    def receive_chunk(self):
+    def read_chunk(self):
         # {{{
 
-        chunk = self.receive_next_chunk()
+        chunk = self.read_next_chunk()
         #_print_ ("2: header_load_counter =", self.header_load_counter)
         if self.header_load_counter > 0:
             self.header += chunk
@@ -418,51 +344,12 @@ class Splitter_IMS(threading.Thread):
         # {{{
 
         self.configure_sockets()
-        self.request_the_video_from_the_source()
+
+        print("Port: %d" % self.port)
+
         self.load_the_video_header()
 
         # }}}
-
-    def listen_a_video_source(self):
-        # {{{ When a video stream is received, the source is replaced by this stream.
-
-        source_socket_in = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            # This does not work in Windows systems !!
-            source_socket_in.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        except:
-            pass
-        source_socket_in.bind(('', self.SOURCE_PORT_IN))
-        source_socket_in.listen(1)
-
-        while (1):
-            if (self.mode == 0):
-                self.source_socket_in, addr = source_socket_in.accept()
-                print ('A new source is connected in:', addr)
-
-                data = self.source_socket_in.recv(1024)
-                print ('Pass from source:', data)
-                print ('Right pass:', self.SOURCE_PASS)
-
-                if (data == self.SOURCE_PASS):
-                    print ('correct password!')
-                    self.mode = 1
-                else:
-                    print ('wrong password')
-                    self.mode = 0
-                    self.source_socket_in.close()
-
-        # }}}
-
-    def set_video_source(self, file):
-        self.videoFile = file
-
-    def read_video_chunk(self, length):
-        read_data = self.videoFile.read(length)
-        read_amount = len(read_data)
-        if read_data < self.CHUNK_SIZE:
-            read_data += self.read_video_chunk(self.CHUNK_SIZE-read_amount)
-        return read_data
 
     def run(self):
         # {{{
@@ -472,15 +359,15 @@ class Splitter_IMS(threading.Thread):
         print(self.peer_connection_socket.getsockname(), "\b: waiting for a peer ...")
         self.handle_a_peer_arrival(self.peer_connection_socket.accept())
         threading.Thread(target=self.handle_arrivals).start()
-        threading.Thread(target=self.listen_a_video_source).start()
 
         message_format = self.chunk_number_format + str(self.CHUNK_SIZE) + "s"
         #_print_("4: header_load_counter =", self.header_load_counter)
         while self.alive:
-            if self.videoFile is not None:
-                video_chunk = self.read_video_chunk(self.CHUNK_SIZE)
-                message = struct.pack(message_format, socket.htons(self.chunk_number), video_chunk)
-                self.send_chunk(message, self.mcast_channel)
-                self.chunk_number = (self.chunk_number + 1) % common.MAX_CHUNK_NUMBER
+            #self.receive_and_send_a_chunk(header_load_counter)
+            chunk = self.read_chunk()
+            message = struct.pack(message_format, socket.htons(self.chunk_number), chunk)
+            #self.send_chunk(self.receive_chunk(header_load_counter), self.mcast_channel)
+            self.send_chunk(message, self.mcast_channel)
+            self.chunk_number = (self.chunk_number + 1) % common.MAX_CHUNK_NUMBER
         # }}}
     # }}}

@@ -15,6 +15,11 @@ import android.view.Window;
 
 import com.example.arasthel.sprinkler.mp4.MP4Config;
 
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.BasicHttpEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -42,8 +47,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
     List<Camera.Size> previewSizes;
 
-    DatagramSocket socket;
-
     MediaRecorder mediaRecorder;
 
     ParcelFileDescriptor parcelRead, parcelWrite;
@@ -54,17 +57,7 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
     private Camera.Size cameraSize;
 
-    private String pps, sps, profile;
-
     private InputStream is;
-
-    private byte[] header = new byte[5];
-
-    private byte[] buffer;
-
-    private int naluLength;
-
-    private FileOutputStream fos;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,20 +73,12 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         previewSizes = camera.getParameters().getSupportedPreviewSizes();
         cameraSize = determinePreviewSize(false, 1280, 720);
 
-        /*Camera.Parameters parameters = camera.getParameters();
-        parameters.setPreviewSize(cameraSize.width, cameraSize.height);
-        parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
-        parameters.setFlashMode(Camera.Parameters.FLASH_MODE_ON);
-        camera.setParameters(parameters);*/
-
         camera.unlock();
 
         mediaRecorder = new MediaRecorder();
 
         configureMediaRecorder();
 
-
-        //mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_LOW));
 
         Log.d("SIZE", cameraSize.width+"x"+cameraSize.height);
 
@@ -104,7 +89,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
     private void configureMediaRecorder() {
         mediaRecorder.setCamera(camera);
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-        //mediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
 
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
 
@@ -113,10 +97,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         mediaRecorder.setVideoEncodingBitRate(17000000);
         mediaRecorder.setVideoFrameRate(30);
 
-        //CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
-
-
-        //mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H263);
     }
 
@@ -125,11 +105,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         public void run() {
             super.run();
             try {
-                socket = new DatagramSocket();
-                socket.connect(InetAddress.getByName("192.168.10.169"), 8080);
-
-                long lastPass = 0;
-
                 MessageDigest digest = MessageDigest.getInstance("MD5");
                 digest.update("hackme".getBytes());
 
@@ -154,22 +129,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
                 new StreamingThread().start();
 
-                /*DatagramPacket ppsPacket = new DatagramPacket(pps.getBytes(), pps.length());
-                DatagramPacket spsPacket = new DatagramPacket(sps.getBytes(), sps.length());
-
-                while(running) {
-                    if((System.currentTimeMillis()) - lastPass >= 3000) {
-                        lastPass = System.currentTimeMillis();
-                        Log.d("SPS", "SPS & PPS sent");
-                        socket.send(ppsPacket);
-                        socket.send(spsPacket);
-                        fos.write(pps.getBytes());
-                        fos.write(sps.getBytes());
-                    }
-                }*/
-
-            } catch (IOException e) {
-                e.printStackTrace();
             } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
             }
@@ -209,42 +168,20 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
                 Log.d("SPRINKLER", "MPEG HEADER SKIPPED");
 
-                int read = 0;
+                HttpPost post = new HttpPost("http://192.168.1.129:8000/emit?channel=prueba");
+                BasicHttpEntity httpEntity = new BasicHttpEntity();
+                httpEntity.setChunked(true);
+                httpEntity.setContentLength(-1);
+                httpEntity.setContent(is);
 
-                DatagramPacket packet;
+                post.setEntity(httpEntity);
 
-                /*do {
-                    // Read NALU header
-                    fill(header, 0, 5);
-                    naluLength = header[3]&0xFF | (header[2]&0xFF)<<8 | (header[1]&0xFF)<<16 | (header[0]&0xFF)<<24;
-                    Log.d("NALU", "LENGTH: "+naluLength);
-                    if (naluLength>100000 || naluLength<0) resync();
-
-                    buffer = new byte[5+naluLength];
-                    for(int i = 0; i < 5; i++) {
-                        buffer[i] = header[i];
-                    }
-                    read = fill(buffer, 5, naluLength-1);
-                    packet = new DatagramPacket(buffer, buffer.length);
-                    fos.write(buffer);
-                    socket.send(packet);
-
-                } while(read > 0);*/
-
-                do {
-                    // Read H263 chuncks
-                    buffer = new byte[256];
-                    read = fill(buffer, 0, buffer.length);
-                    packet = new DatagramPacket(buffer, buffer.length);
-                    //fos.write(buffer);
-                    socket.send(packet);
-                    //Log.d("SPRINKLER", "Sent chunk of "+read+" bytes");
-                } while(running);
+                HttpClient client = new DefaultHttpClient();
+                client.execute(post);
 
                 parcelRead.close();
                 parcelWrite.close();
 
-                //socket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -335,38 +272,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         mediaRecorder.release();
         //camera.lock();
         camera.release();
-    }
-
-    private void resync() throws IOException {
-        int type;
-
-        Log.e("ERROR","Packetizer out of sync ! Let's try to fix that...(NAL length: "+naluLength+")");
-
-        while (true) {
-
-            header[0] = header[1];
-            header[1] = header[2];
-            header[2] = header[3];
-            header[3] = header[4];
-            header[4] = (byte) is.read();
-
-            type = header[4]&0x1F;
-
-            if (type == 5 || type == 1) {
-                naluLength = header[3]&0xFF | (header[2]&0xFF)<<8 | (header[1]&0xFF)<<16 | (header[0]&0xFF)<<24;
-                if (naluLength>0 && naluLength<100000) {
-                    Log.e("ERROR","A NAL unit may have been found in the bit stream !");
-                    break;
-                }
-                if (naluLength==0) {
-                    Log.e("ERROR","NAL unit with NULL size found...");
-                } else if (header[3]==0xFF && header[2]==0xFF && header[1]==0xFF && header[0]==0xFF) {
-                    Log.e("ERROR","NAL unit with 0xFFFFFFFF size found...");
-                }
-            }
-
-        }
-
     }
 
 }
