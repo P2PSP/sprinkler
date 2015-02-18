@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.Window;
+import android.view.WindowManager;
 
 import com.example.arasthel.sprinkler.mp4.MP4Config;
 
@@ -51,17 +52,20 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
     ParcelFileDescriptor parcelRead, parcelWrite;
 
-    private final static String TEST_FILE_PATH = Environment.getExternalStorageDirectory().getAbsolutePath()+"/prueba.mp4";
-
     public static boolean running = false;
 
     private Camera.Size cameraSize;
 
     private InputStream is;
 
+    public static final String SERVER_ADDRESS = "192.168.1.129";
+    public static final int SERVER_PORT = 8000;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_camera_acitvity);
@@ -78,9 +82,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
         mediaRecorder = new MediaRecorder();
 
         configureMediaRecorder();
-
-
-        Log.d("SIZE", cameraSize.width+"x"+cameraSize.height);
 
         new ControlThread().start();
 
@@ -114,6 +115,8 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
                 for (int i = 0; i < passwordBytes.length; i++) {
                     hexString.append(Integer.toHexString(0xFF & passwordBytes[i]));
                 }
+
+                // Send password to splitter, disabled for tests
 
                 /*socket.getOutputStream().write(hexString.toString().getBytes("UTF-8"));
 
@@ -168,7 +171,7 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
                 Log.d("SPRINKLER", "MPEG HEADER SKIPPED");
 
-                HttpPost post = new HttpPost("http://192.168.1.129:8000/emit?channel=prueba");
+                HttpPost post = new HttpPost("http://"+SERVER_ADDRESS+":"+SERVER_PORT+"/emit?channel=prueba");
                 BasicHttpEntity httpEntity = new BasicHttpEntity();
                 httpEntity.setChunked(true);
                 httpEntity.setContentLength(-1);
@@ -179,9 +182,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
                 HttpClient client = new DefaultHttpClient();
                 client.execute(post);
 
-                parcelRead.close();
-                parcelWrite.close();
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -189,19 +189,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
         }
     }
-
-    private int fill(byte[] buffer, int offset,int length) throws IOException {
-        int sum = 0, len;
-        while (sum<length) {
-            len = is.read(buffer, offset + sum, length - sum);
-            if (len<0) {
-                throw new IOException("End of stream");
-            }
-            else sum+=len;
-        }
-        return sum;
-    }
-
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
@@ -270,7 +257,6 @@ public class CameraActivity extends Activity implements SurfaceHolder.Callback {
 
         mediaRecorder.stop();
         mediaRecorder.release();
-        //camera.lock();
         camera.release();
     }
 

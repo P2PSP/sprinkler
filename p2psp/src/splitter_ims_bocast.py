@@ -110,8 +110,9 @@ class Splitter_IMS(threading.Thread):
 
         # }}}
 
-    def set_source(self, source_file):
-        self.source = source_file
+    def set_source(self, port):
+        self.source = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.source.connect(('127.0.0.1', port))
 
     def print_the_module_name(self):
         # {{{
@@ -298,12 +299,12 @@ class Splitter_IMS(threading.Thread):
     def read_next_chunk(self):
         # {{{
 
-        chunk = self.source.read(self.CHUNK_SIZE)
+        chunk = self.source.recv(self.CHUNK_SIZE)
 
         read_count = len(chunk)
 
         while read_count < self.CHUNK_SIZE:
-            chunk += self.source.read(self.CHUNK_SIZE - read_count)
+            chunk += self.source.recv(self.CHUNK_SIZE - read_count)
             read_count = len(chunk)
 
         return chunk

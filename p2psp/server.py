@@ -6,8 +6,12 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from src import splitter_bocast
 from urlparse import urlparse, parse_qs
 from threading import Thread
+import socket
 
 channels = {}
+
+SERVER_IP = '192.168.1.129'
+SERVER_PORT = 8000
 
 class ThreadedHttpServer(SocketServer.ThreadingMixIn, HTTPServer):
     pass
@@ -24,11 +28,12 @@ class RequestHandler (BaseHTTPRequestHandler):
             if channel in channels.keys():
                 self.send_response(200)
             else:
+                # couldn't find channel
                 self.send_response(404)
         else:
+            # the request wasn't properly built
             self.send_response(500)
         self.end_headers()
-        #self.wfile.write(self._get_status())
         return
 
     def do_POST(self):
@@ -46,10 +51,20 @@ class RequestHandler (BaseHTTPRequestHandler):
                 print "New channel", channel
                 channels[channel] = new_splitter
 
-                new_splitter.set_source(self.rfile)
-                new_splitter.start_streaming()
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                # a better port assignation policy is needed
+                sock.bind(('', 9998))
+                sock.listen(1)
 
-                #self.send_response(200)
+                new_splitter.set_source(9998)
+
+                reply_sock, addr = sock.accept()
+
+                read_thread = Thread(target=parse_stream, args=(self.rfile,reply_sock))
+                read_thread.start()
+
+                new_splitter.start_streaming()
 
             else:
                 print "Channel already in list"
@@ -57,29 +72,28 @@ class RequestHandler (BaseHTTPRequestHandler):
         else:
             self.send_response(500)
 
-def print_contents(request):
-    print "Reading data"
-    while request.rfile is not None:
-        read_data = request.rfile.read(100)
-        if len(read_data) <= 0:
-            break
-        else:
-            print read_data
-    print "Out of loop"
-    request.send_response(200)
-
-def read_video_from_request(request, channel, splitter):
-    while True:
-        chunk = request.rfile.read(1024)
-        # Pasamos el chunk al splitter
-        # splitter. ...
-        if not chunk:
-            del channels[channel]
-            break
-
+def parse_stream(origin, splitter_socket):
+    # number of bytes to read on hex chars
+    bytes_to_read = origin.read(3)
+    # real amount of bytes to read
+    amount = int(bytes_to_read, 16)
+    # skip '\r\n' bytes
+    origin.read(2)
+    # read the whole 'http chunk' and pass it to the splitter
+    read_bytes = origin.read(amount)
+    splitter_socket.sendall(read_bytes)
+    while len(read_bytes) > 0:
+        # if not 1st chunk, '\r\n' is also before the chunk size
+        origin.read(2)
+        bytes_to_read = origin.read(3)
+        amount = int(bytes_to_read, 16)
+        origin.read(2)
+        read_bytes = origin.read(amount)
+        splitter_socket.sendall(read_bytes)
 
 def main (args):
-    httpd = ThreadedHttpServer(('192.168.1.129', 8000), RequestHandler)
+    # create a threaded http server, each request is handled in a new thread
+    httpd = ThreadedHttpServer((SERVER_IP, SERVER_PORT), RequestHandler)
     httpd.serve_forever()
 
 if __name__ == "__main__":
