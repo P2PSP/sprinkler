@@ -5,7 +5,7 @@ android {
     buildToolsVersion "21.0.1"
 
     defaultConfig {
-        applicationId "com.example.arasthel.p2pspstreamer"
+        applicationId "com.luxunda.p2pspstreamer"
         minSdkVersion 14
         targetSdkVersion 21
         versionCode 1
@@ -21,5 +21,5 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':libstreaming')
+    compile project(':kickflip-android-sdk:sdk')
 }

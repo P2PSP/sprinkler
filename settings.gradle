@@ -1,2 +1,3 @@
 include ':app', ':sprinkler'
+include ':kickflip-android-sdk:sdk'
 include ':libstreaming'
