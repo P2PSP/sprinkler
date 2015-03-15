@@ -1,6 +1,7 @@
 package io.kickflip.sdk.av;
 
 import android.content.Context;
+import android.os.Handler;
 import android.util.Log;
 
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -60,7 +61,6 @@ public class Broadcaster extends AVRecorder {
     private HlsStream mStream;
     private HlsFileObserver mFileObserver;
     private LinkedBlockingQueue<File> mUploadQueue;
-    private SessionConfig mConfig;
     private BroadcastListener mBroadcastListener;
     private EventBus mEventBus;
     private boolean mReadyToBroadcast;                                  // Kickflip user registered and endpoint ready
@@ -88,7 +88,6 @@ public class Broadcaster extends AVRecorder {
         //checkArgument(CLIENT_ID != null && CLIENT_SECRET != null);
         init();
         mContext = context;
-        mConfig = config;
         mConfig.getMuxer().setEventBus(mEventBus);
         mVideoBitrate = mConfig.getVideoBitrate();
         if (VERBOSE) Log.i(TAG, "Initial video bitrate : " + mVideoBitrate);
@@ -97,25 +96,8 @@ public class Broadcaster extends AVRecorder {
         mVodManifest = new File(mManifestSnapshotDir, VOD_FILENAME);
         writeEventManifestHeader(mConfig.getHlsSegmentDuration());
 
-        String watchDir = config.getOutputDirectory().getAbsolutePath();
-        mFileObserver = new HlsFileObserver(watchDir, mEventBus);
-        mFileObserver.startWatching();
-        if (VERBOSE) Log.i(TAG, "Watching " + watchDir);
-
         mReadyToBroadcast = false;
         Kickflip.setup(context);
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    serverSocket = new ServerSocket(8000);
-                    uploadSocket = serverSocket.accept();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
 
     }
 
@@ -175,6 +157,26 @@ public class Broadcaster extends AVRecorder {
     @Override
     public void startRecording() {
         super.startRecording();
+
+        mUploadQueue = new LinkedBlockingQueue<File>();
+
+        String watchDir = new File(mConfig.getOutputPath()).getParent();
+        mFileObserver = new HlsFileObserver(watchDir, mEventBus);
+        mFileObserver.startWatching();
+        if (VERBOSE) Log.i(TAG, "Watching " + watchDir);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    serverSocket = new ServerSocket(8000);
+                    uploadSocket = serverSocket.accept();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
         onGotStreamResponse(new HlsStream());
         dequeueUploads();
     }
@@ -212,10 +214,31 @@ public class Broadcaster extends AVRecorder {
     @Override
     public void stopRecording() {
         super.stopRecording();
-        mSentBroadcastLiveEvent = false;
-        if (mStream != null) {
-
+        mFileObserver.stopWatching();
+        if(uploadSocket.isConnected()) {
+            try {
+                uploadSocket.close();
+                serverSocket.close();
+                serverSocket = null;
+                uploadSocket = null;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
+        mSentBroadcastLiveEvent = false;
+        File currentDirectory = new File(mConfig.getOutputPath()).getParentFile();
+        deleteFolder(currentDirectory);
+    }
+
+    private void deleteFolder(File folder) {
+        for(File file : folder.listFiles()) {
+            if(file.isDirectory()) {
+                deleteFolder(file);
+            } else {
+                file.delete();
+            }
+        }
+        folder.delete();
     }
 
     /**
@@ -320,7 +343,7 @@ public class Broadcaster extends AVRecorder {
             e1.printStackTrace();
         }
         queueOrSubmitUpload(copy);
-        appendLastManifestEntryToEventManifest(copy, !isRecording());
+        //appendLastManifestEntryToEventManifest(copy, !isRecording());
         mNumSegmentsWritten++;
     }
 
@@ -428,8 +451,6 @@ public class Broadcaster extends AVRecorder {
      * @param file local file
      */
     private void queueUpload(File file) {
-        if (mUploadQueue == null)
-            mUploadQueue = new LinkedBlockingQueue<File>();
         mUploadQueue.add(file);
     }
 
@@ -457,8 +478,12 @@ public class Broadcaster extends AVRecorder {
                         continue;
                     }
 
-                    if (uploadSocket != null)
-                        uploadSocket.getOutputStream().write(buffer);
+                    if(uploadSocket != null) {
+                        synchronized (uploadSocket) {
+                            if (!uploadSocket.isClosed())
+                                uploadSocket.getOutputStream().write(buffer);
+                        }
+                    }
 
                     packetNumber++;
                 }

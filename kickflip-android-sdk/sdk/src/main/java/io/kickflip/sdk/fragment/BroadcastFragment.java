@@ -13,6 +13,8 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,8 +31,10 @@ import com.google.common.eventbus.Subscribe;
 import io.kickflip.sdk.Kickflip;
 import io.kickflip.sdk.R;
 import io.kickflip.sdk.Share;
+import io.kickflip.sdk.activity.BroadcastActivity;
 import io.kickflip.sdk.av.Broadcaster;
 import io.kickflip.sdk.av.FullFrameRect;
+import io.kickflip.sdk.av.SessionConfig;
 import io.kickflip.sdk.event.BroadcastIsBufferingEvent;
 import io.kickflip.sdk.event.BroadcastIsLiveEvent;
 import io.kickflip.sdk.view.GLCameraEncoderView;
@@ -62,8 +66,9 @@ public class BroadcastFragment extends Fragment implements AdapterView.OnItemSel
         @Override
         public void onClick(View v) {
             if (mBroadcaster.isRecording()) {
-                mBroadcaster.stopRecording();
+                stopBroadcasting();
                 hideLiveBanner();
+                v.setBackgroundResource(R.drawable.red_dot);
             } else {
                 mBroadcaster.startRecording();
                 //stopMonitoringOrientation();
@@ -243,7 +248,7 @@ public class BroadcastFragment extends Fragment implements AdapterView.OnItemSel
                 mBroadcaster = new Broadcaster(context, Kickflip.getSessionConfig());
                 mBroadcaster.getEventBus().register(this);
                 mBroadcaster.setBroadcastListener(Kickflip.getBroadcastListener());
-                Kickflip.clearSessionConfig();
+                //Kickflip.clearSessionConfig();
             }
         }
     }
@@ -355,8 +360,25 @@ public class BroadcastFragment extends Fragment implements AdapterView.OnItemSel
     public void stopBroadcasting() {
         if (mBroadcaster.isRecording()) {
             mBroadcaster.stopRecording();
-            mBroadcaster.release();
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    SessionConfig currentConfig = Kickflip.getSessionConfig();
+                    Kickflip.clearSessionConfig();
+                    SessionConfig config = new SessionConfig.Builder(Environment.getExternalStorageDirectory()+"/KickFlip/video.m3u8")
+                            .withAdaptiveStreaming(currentConfig.isAdaptiveBitrate())
+                            .withVideoResolution(currentConfig.getVideoWidth(), currentConfig.getVideoHeight())
+                            .withVideoBitrate(currentConfig.getVideoBitrate())
+                            .withAudioBitrate(currentConfig.getAudioBitrate())
+                            .withHlsSegmentDuration(currentConfig.getHlsSegmentDuration())
+                            .build();
+                    Kickflip.setSessionConfig(config);
+                    mBroadcaster.reset(Kickflip.getSessionConfig());
+                }
+            }, 500);
+
         }
+
     }
 
 

@@ -65,10 +65,7 @@ public class HlsFileObserver extends FileObserver {
         if (path == null) return; // If the directory was deleted.
         String ext = path.substring(path.lastIndexOf('.') + 1);
         String absolutePath = mObservedPath + File.separator + path;
-        if (ext.compareTo(M3U8_EXT) == 0) {
-            if (VERBOSE) Log.i(TAG, "posting manifest written " + absolutePath);
-            mEventBus.post(new HlsManifestWrittenEvent(absolutePath));
-        } else if (ext.compareTo(TS_EXT) == 0) {
+        if (ext.compareTo(TS_EXT) == 0) {
             if (VERBOSE) Log.i(TAG, "posting hls segment written " + absolutePath);
             mEventBus.post(new HlsSegmentWrittenEvent(absolutePath));
         } else if (ext.compareTo(JPG_EXT) == 0) {

@@ -152,7 +152,8 @@ public class CameraEncoder implements SurfaceTexture.OnFrameAvailableListener, R
         if (mState != STATE.UNINITIALIZED)
             throw new IllegalArgumentException("reset called in invalid state");
         mState = STATE.INITIALIZING;
-        mHandler.sendMessage(mHandler.obtainMessage(MSG_RESET, config));
+        if(mHandler != null)
+            mHandler.sendMessage(mHandler.obtainMessage(MSG_RESET, config));
     }
 
     private void handleReset(SessionConfig config) {
@@ -675,7 +676,7 @@ public class CameraEncoder implements SurfaceTexture.OnFrameAvailableListener, R
         if (VERBOSE) Log.d(TAG, "Encoder thread exiting");
         synchronized (mReadyFence) {
             mReady = mRunning = false;
-            mHandler = null;
+            //mHandler = null;
             mReadyFence.notify();
         }
     }

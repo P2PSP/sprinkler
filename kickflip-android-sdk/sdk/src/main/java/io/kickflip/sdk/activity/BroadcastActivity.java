@@ -54,7 +54,7 @@ public class BroadcastActivity extends ImmersiveActivity implements BroadcastLis
 
     @Override
     public void onBroadcastStop() {
-        finish();
+        //finish();
         mMainBroadcastListener.onBroadcastStop();
     }
 
