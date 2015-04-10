@@ -21,7 +21,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import io.kickflip.sdk.av.Broadcaster;
-import io.kickflip.sdk.event.S3UploadEvent;
+import io.kickflip.sdk.event.UploadSegmentEvent;
 
 /**
  * Manages a sequence of S3 uploads on behalf of
@@ -84,7 +84,7 @@ public class S3BroadcastManager implements Runnable {
                         int bytesPerSecond = (int) (file.length() / (uploadDurationMillis / 1000.0));
                         if (VERBOSE)
                             Log.i(TAG, "Uploaded " + file.length() / 1000.0 + " KB in " + (uploadDurationMillis) + "ms (" + bytesPerSecond / 1000.0 + " KBps)");
-                        mBroadcaster.onS3UploadComplete(new S3UploadEvent(file, url, bytesPerSecond));
+                        mBroadcaster.onUploadComplete(new UploadSegmentEvent(file, url, bytesPerSecond));
                     } else if (progressEvent.getEventCode() == ProgressEvent.FAILED_EVENT_CODE) {
                         Log.w(TAG, "Upload failed for " + url);
                     }

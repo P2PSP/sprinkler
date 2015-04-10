@@ -66,7 +66,7 @@ public class FFmpegWrapper {
         public int numAudioChannels = 1;
     	
         // Format specific options
-        public int hlsSegmentDurationSec = 2;
+        public int hlsSegmentDurationSec = 1;
 
         public String outputFormatName = "hls";
         // TODO: Provide a Map for format-specific options

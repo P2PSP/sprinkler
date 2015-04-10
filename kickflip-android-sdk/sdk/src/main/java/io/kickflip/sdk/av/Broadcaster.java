@@ -1,7 +1,6 @@
 package io.kickflip.sdk.av;
 
 import android.content.Context;
-import android.os.Handler;
 import android.util.Log;
 
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -27,7 +26,7 @@ import io.kickflip.sdk.event.BroadcastIsLiveEvent;
 import io.kickflip.sdk.event.HlsManifestWrittenEvent;
 import io.kickflip.sdk.event.HlsSegmentWrittenEvent;
 import io.kickflip.sdk.event.MuxerFinishedEvent;
-import io.kickflip.sdk.event.S3UploadEvent;
+import io.kickflip.sdk.event.UploadSegmentEvent;
 import io.kickflip.sdk.event.StreamLocationAddedEvent;
 import io.kickflip.sdk.event.ThumbnailWrittenEvent;
 
@@ -75,6 +74,8 @@ public class Broadcaster extends AVRecorder {
 
     private ServerSocket serverSocket;
     private Socket uploadSocket;
+
+    private boolean sending = false;
 
 
     /**
@@ -158,6 +159,8 @@ public class Broadcaster extends AVRecorder {
     public void startRecording() {
         super.startRecording();
 
+        sending = false;
+
         mUploadQueue = new LinkedBlockingQueue<File>();
 
         String watchDir = new File(mConfig.getOutputPath()).getParent();
@@ -215,16 +218,17 @@ public class Broadcaster extends AVRecorder {
     public void stopRecording() {
         super.stopRecording();
         mFileObserver.stopWatching();
-        if(uploadSocket.isConnected()) {
-            try {
+        try {
+            if(uploadSocket != null && uploadSocket.isConnected()) {
                 uploadSocket.close();
-                serverSocket.close();
-                serverSocket = null;
-                uploadSocket = null;
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+            serverSocket.close();
+            serverSocket = null;
+            uploadSocket = null;
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
         mSentBroadcastLiveEvent = false;
         File currentDirectory = new File(mConfig.getOutputPath()).getParentFile();
         deleteFolder(currentDirectory);
@@ -252,8 +256,11 @@ public class Broadcaster extends AVRecorder {
     @Subscribe
     public void onSegmentWritten(HlsSegmentWrittenEvent event) {
         try {
+            // We wait to have at least 2 segments so buffering is better
+            if(!sending) {
+                sending = true;
+            }
             File hlsSegment = event.getSegment();
-            queueOrSubmitUpload(hlsSegment);
             if (isKitKat() && mConfig.isAdaptiveBitrate() && isRecording()) {
                 // Adjust bitrate to match expected filesize
                 long actualSegmentSizeBytes = hlsSegment.length();
@@ -275,6 +282,7 @@ public class Broadcaster extends AVRecorder {
                     adjustVideoBitrate(mVideoBitrate);
                 }
             }
+            queueOrSubmitUpload(hlsSegment);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -288,7 +296,7 @@ public class Broadcaster extends AVRecorder {
      * <p/>
      * Called on a background thread
      */
-    private void onSegmentUploaded(S3UploadEvent uploadEvent) {
+    private void onSegmentUploaded(UploadSegmentEvent uploadEvent) {
         if (mDeleteAfterUploading) {
             boolean deletedFile = uploadEvent.getFile().delete();
             if (VERBOSE)
@@ -352,7 +360,7 @@ public class Broadcaster extends AVRecorder {
      * <p/>
      * Called on a background thread
      */
-    private void onManifestUploaded(S3UploadEvent uploadEvent) {
+    private void onManifestUploaded(UploadSegmentEvent uploadEvent) {
         if (mDeleteAfterUploading) {
             if (VERBOSE) Log.i(TAG, "Deleting " + uploadEvent.getFile().getAbsolutePath());
             uploadEvent.getFile().delete();
@@ -391,7 +399,7 @@ public class Broadcaster extends AVRecorder {
      * <p/>
      * Called on a background thread
      */
-    private void onThumbnailUploaded(S3UploadEvent uploadEvent) {
+    private void onThumbnailUploaded(UploadSegmentEvent uploadEvent) {
         if (mDeleteAfterUploading) uploadEvent.getFile().delete();
         if (mStream != null) {
             mStream.setThumbnailUrl(uploadEvent.getDestinationUrl());
@@ -460,13 +468,16 @@ public class Broadcaster extends AVRecorder {
 
     private void submitUpload(final File file, boolean lastUpload) {
         // Valid ts file
+        // TODO get real URL from webservice
+        String url = "nothing here";
+        getEventBus().post(new BroadcastIsLiveEvent(url));
         long startSending = System.currentTimeMillis();
         if(file.getName().endsWith(".ts")) {
             Log.d("BROADCASTER", "Sending file " + file.getName());
             mReadyToBroadcast = false;
-            int packetNumber = 0;
             int bufferSize = 18800;
             int read = 0;
+            long total = 0;
             try {
                 FileInputStream fis = new FileInputStream(file);
                 byte[] buffer = new byte[bufferSize];
@@ -474,6 +485,7 @@ public class Broadcaster extends AVRecorder {
                     if (read < bufferSize) {
                         read += fis.read(buffer, read, bufferSize - read);
                     }
+                    total += read;
                     if (buffer[0] != 71) {
                         continue;
                     }
@@ -484,27 +496,16 @@ public class Broadcaster extends AVRecorder {
                                 uploadSocket.getOutputStream().write(buffer);
                         }
                     }
-
-                    packetNumber++;
                 }
+                long timeElapsed = System.currentTimeMillis() - startSending;
                 Log.d("BROADCASTER", "Finished sending file " + file.getName());
-                if (mDeleteAfterUploading) {
-                    String fileName = file.getName();
-                    int number = Integer.parseInt(fileName.substring(5, fileName.indexOf(".ts")));
-                    number -= 8;
-                    if(number >= 0) {
-                        File fileToDelete = new File(file.getParent(), "video"+number+".ts");
-                        if(fileToDelete.exists()) {
-                            fileToDelete.delete();
-                        }
-                    }
-                }
+                int bps = (int) ((total*1000)/timeElapsed);
+                onUploadComplete(new UploadSegmentEvent(file, ".ts", bps));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            long timeElapsed = System.currentTimeMillis() - startSending;
             mReadyToBroadcast = true;
             if(!mUploadQueue.isEmpty()) {
                 Log.d("BROADCASTER", "Queue size: " +mUploadQueue.size() +", sending next file.");
@@ -521,7 +522,7 @@ public class Broadcaster extends AVRecorder {
      * <p/>
      * Called on a background thread
      */
-    public void onS3UploadComplete(S3UploadEvent uploadEvent) {
+    public void onUploadComplete(UploadSegmentEvent uploadEvent) {
         if (VERBOSE) Log.i(TAG, "Upload completed for " + uploadEvent.getDestinationUrl());
         if (uploadEvent.getDestinationUrl().contains(".m3u8")) {
             onManifestUploaded(uploadEvent);

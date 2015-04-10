@@ -475,7 +475,7 @@ public class CameraEncoder implements SurfaceTexture.OnFrameAvailableListener, R
     /**
      * Called on Encoder thread
      *
-     * @param surfaceTexture the SurfaceTexure that initiated the call to onFrameAvailable
+     * @param surfaceTexture the SurfaceTexture that initiated the call to onFrameAvailable
      */
     private void handleFrameAvailable(SurfaceTexture surfaceTexture) {
         if (TRACE) Trace.beginSection("handleFrameAvail");
@@ -564,7 +564,7 @@ public class CameraEncoder implements SurfaceTexture.OnFrameAvailableListener, R
         synchronized (mReadyForFrameFence) {
             // Pause the GLSurfaceView's Renderer thread
             if (mDisplayView != null)
-                mDisplayView.onPause();
+                //mDisplayView.onPause();
             // Release camera if we're not recording
             if (!mRecording && mSurfaceTexture != null) {
                 if (VERBOSE) Log.i("CameraRelease", "Releasing camera");
