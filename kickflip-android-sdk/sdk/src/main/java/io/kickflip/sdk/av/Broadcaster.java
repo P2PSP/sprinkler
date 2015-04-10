@@ -256,7 +256,6 @@ public class Broadcaster extends AVRecorder {
     @Subscribe
     public void onSegmentWritten(HlsSegmentWrittenEvent event) {
         try {
-            // We wait to have at least 2 segments so buffering is better
             if(!sending) {
                 sending = true;
             }
