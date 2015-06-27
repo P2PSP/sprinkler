@@ -1,6 +1,7 @@
 package io.kickflip.sdk.activity;
 
 import android.os.Bundle;
+import android.widget.Toast;
 
 import io.kickflip.sdk.Kickflip;
 import io.kickflip.sdk.R;
@@ -54,12 +55,13 @@ public class BroadcastActivity extends ImmersiveActivity implements BroadcastLis
 
     @Override
     public void onBroadcastStop() {
-        //finish();
+        finish();
         mMainBroadcastListener.onBroadcastStop();
     }
 
     @Override
     public void onBroadcastError(KickflipException error) {
+        Toast.makeText(this, error.getMessage(), Toast.LENGTH_SHORT).show();
         mMainBroadcastListener.onBroadcastError(error);
     }
 

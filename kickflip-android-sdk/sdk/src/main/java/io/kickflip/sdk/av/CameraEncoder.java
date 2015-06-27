@@ -150,7 +150,7 @@ public class CameraEncoder implements SurfaceTexture.OnFrameAvailableListener, R
      */
     public void reset(SessionConfig config) {
         if (mState != STATE.UNINITIALIZED)
-            throw new IllegalArgumentException("reset called in invalid state");
+            throw new IllegalArgumentException("reset called in invalid state: "+mState);
         mState = STATE.INITIALIZING;
         if(mHandler != null)
             mHandler.sendMessage(mHandler.obtainMessage(MSG_RESET, config));
@@ -400,7 +400,7 @@ public class CameraEncoder implements SurfaceTexture.OnFrameAvailableListener, R
      */
     public void stopRecording() {
         if (mState != STATE.RECORDING)
-            throw new IllegalArgumentException("StopRecording called in invalid state");
+            throw new IllegalArgumentException("StopRecording called in invalid state: "+mState);
         mState = STATE.STOPPING;
         Log.i(TAG, "stopRecording");
         synchronized (mReadyForFrameFence) {

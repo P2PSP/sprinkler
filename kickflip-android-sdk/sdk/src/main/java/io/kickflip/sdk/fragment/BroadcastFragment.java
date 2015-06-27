@@ -360,23 +360,7 @@ public class BroadcastFragment extends Fragment implements AdapterView.OnItemSel
     public void stopBroadcasting() {
         if (mBroadcaster.isRecording()) {
             mBroadcaster.stopRecording();
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    SessionConfig currentConfig = Kickflip.getSessionConfig();
-                    Kickflip.clearSessionConfig();
-                    SessionConfig config = new SessionConfig.Builder(Environment.getExternalStorageDirectory()+"/KickFlip/video.m3u8")
-                            .withAdaptiveStreaming(currentConfig.isAdaptiveBitrate())
-                            .withVideoResolution(currentConfig.getVideoWidth(), currentConfig.getVideoHeight())
-                            .withVideoBitrate(currentConfig.getVideoBitrate())
-                            .withAudioBitrate(currentConfig.getAudioBitrate())
-                            .withHlsSegmentDuration(currentConfig.getHlsSegmentDuration())
-                            .build();
-                    Kickflip.setSessionConfig(config);
-                    mBroadcaster.reset(Kickflip.getSessionConfig());
-                }
-            }, 500);
-
+            mBroadcaster.release();
         }
 
     }

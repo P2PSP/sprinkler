@@ -1,0 +1,75 @@
+HTTPPort 8090
+HTTPBindAddress 0.0.0.0
+MaxHTTPConnections 2000
+MaxClients 1000
+
+<Feed video.ffm>
+   # video stream.
+   File ./tmp/tmpvideofile.ffm
+   # Maximum file size for buffering video
+   FileMaxSize 128M
+</Feed>
+
+<Stream video.m3u8>
+   Feed video.ffm
+   Format hls
+
+   VideoCodec libx264
+   VideoFrameRate 24
+   # For some reason, when bitare is over 900, it will fail. Maybe because of ffmpeg version?
+   VideoBitRate 900
+   VideoSize 1280x720
+#   AVOptionVideo vpre slower
+#   AVOptionVideo vpre baseline
+#   AVOptionVideo crf 18
+#   AVOptionVideo bufsize 8096
+   AVOptionVideo flags +global_header
+
+    AudioCodec aac
+    AudioBitRate 64
+    AudioChannels 2
+    AudioSampleRate 48000
+    AVOptionAudio flags +global_header
+
+   # Go back 1s
+   PreRoll 1
+
+</Stream>
+
+<Stream video.webm>
+    Feed video.ffm
+    Format webm
+
+    # Video Settings
+    AudioCodec vorbis
+    VideoFrameRate 24
+    VideoSize 1280x720
+
+    # Audio settings
+    AudioSampleRate 48000
+    AVOptionAudio flags +global_header
+
+    MaxTime 0
+    AVOptionVideo me_range 16
+    AVOptionVideo qdiff 4
+    AVOptionVideo qmin 4
+    AVOptionVideo qmax 40
+    #AVOptionVideo good
+    AVOptionVideo flags +global_header
+
+    # Streaming settings
+    PreRoll 1
+</Stream>
+
+# Server status URL
+<Stream status.html>
+   Format status
+   # Only allow local people to get the status
+   ACL allow localhost
+</Stream>
+
+# Just an URL redirect for index
+<Redirect index.html>
+   # Redirect index.html to the appropriate site
+   URL http://www.ffmpeg.org/
+</Redirect>

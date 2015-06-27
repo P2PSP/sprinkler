@@ -11,10 +11,9 @@ import com.google.common.eventbus.Subscribe;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import io.kickflip.sdk.FileUtils;
@@ -26,9 +25,9 @@ import io.kickflip.sdk.event.BroadcastIsLiveEvent;
 import io.kickflip.sdk.event.HlsManifestWrittenEvent;
 import io.kickflip.sdk.event.HlsSegmentWrittenEvent;
 import io.kickflip.sdk.event.MuxerFinishedEvent;
-import io.kickflip.sdk.event.UploadSegmentEvent;
 import io.kickflip.sdk.event.StreamLocationAddedEvent;
 import io.kickflip.sdk.event.ThumbnailWrittenEvent;
+import io.kickflip.sdk.event.UploadSegmentEvent;
 
 import static io.kickflip.sdk.Kickflip.isKitKat;
 
@@ -72,8 +71,9 @@ public class Broadcaster extends AVRecorder {
     private boolean mDeleteAfterUploading;                              // Should recording files be deleted as they're uploaded?
     private ObjectMetadata mS3ManifestMeta;
 
-    private ServerSocket serverSocket;
-    private Socket uploadSocket;
+    HttpURLConnection connection;
+
+    private final static int CHUNK_SIZE = 1880;
 
     private boolean sending = false;
 
@@ -172,10 +172,18 @@ public class Broadcaster extends AVRecorder {
             @Override
             public void run() {
                 try {
-                    serverSocket = new ServerSocket(8000);
-                    uploadSocket = serverSocket.accept();
+                    String protocol = (String) getSessionConfig().getExtraInfo().get("protocol");
+                    String url = (String) getSessionConfig().getExtraInfo().get("url");
+                    String port = (String) getSessionConfig().getExtraInfo().get("port");
+                    String feed = (String) getSessionConfig().getExtraInfo().get("feed");
+                    connection = (HttpURLConnection) new URL(protocol+"://"+url+":"+port+"/emit?channel="+feed).openConnection();
+                    connection.setChunkedStreamingMode(CHUNK_SIZE);
+
+                    connection.setDoInput(true);
+                    connection.setDoOutput(true);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "startRecording: "+e.getMessage());
+                    stopRecording();
                 }
             }
         }).start();
@@ -218,15 +226,14 @@ public class Broadcaster extends AVRecorder {
     public void stopRecording() {
         super.stopRecording();
         mFileObserver.stopWatching();
-        try {
-            if(uploadSocket != null && uploadSocket.isConnected()) {
-                uploadSocket.close();
-            }
-            serverSocket.close();
-            serverSocket = null;
-            uploadSocket = null;
-        } catch (IOException e) {
-            e.printStackTrace();
+
+        if(connection != null) {
+            connection.disconnect();
+        }
+        connection = null;
+
+        if (mBroadcastListener != null) {
+            mBroadcastListener.onBroadcastStop();
         }
 
         mSentBroadcastLiveEvent = false;
@@ -467,12 +474,11 @@ public class Broadcaster extends AVRecorder {
 
     private void submitUpload(final File file, boolean lastUpload) {
         // Valid ts file
-        // TODO get real URL from webservice
-        String url = "nothing here";
+        String url = (String) getSessionConfig().getExtraInfo().get("url");
         getEventBus().post(new BroadcastIsLiveEvent(url));
         long startSending = System.currentTimeMillis();
         if(file.getName().endsWith(".ts")) {
-            Log.d("BROADCASTER", "Sending file " + file.getName());
+            Log.d(TAG, "Sending file " + file.getName());
             mReadyToBroadcast = false;
             int bufferSize = 18800;
             int read = 0;
@@ -489,25 +495,24 @@ public class Broadcaster extends AVRecorder {
                         continue;
                     }
 
-                    if(uploadSocket != null) {
-                        synchronized (uploadSocket) {
-                            if (!uploadSocket.isClosed())
-                                uploadSocket.getOutputStream().write(buffer);
+                    if(connection != null) {
+                        synchronized (connection) {
+                            connection.getOutputStream().write(buffer);
                         }
                     }
                 }
                 long timeElapsed = System.currentTimeMillis() - startSending;
-                Log.d("BROADCASTER", "Finished sending file " + file.getName());
+                Log.d(TAG, "Finished sending file " + file.getName());
                 int bps = (int) ((total*1000)/timeElapsed);
                 onUploadComplete(new UploadSegmentEvent(file, ".ts", bps));
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                Log.e(TAG, "submitUpload: "+e.getMessage());
+                stopRecording();
+                return;
             }
             mReadyToBroadcast = true;
             if(!mUploadQueue.isEmpty()) {
-                Log.d("BROADCASTER", "Queue size: " +mUploadQueue.size() +", sending next file.");
+                Log.d(TAG, "Queue size: " +mUploadQueue.size() +", sending next file.");
                 submitUpload(mUploadQueue.poll());
             }
         }
