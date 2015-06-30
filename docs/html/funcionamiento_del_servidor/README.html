@@ -1,0 +1,286 @@
+<!DOCTYPE HTML>
+<html lang="en-US" >
+    
+    <head>
+        
+        <meta charset="UTF-8">
+        <title>Funcionamiento del servidor | Introducción</title>
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 1.0.3">
+        <meta name="HandheldFriendly" content="true"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black">
+        <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../gitbook/images/apple-touch-icon-precomposed-152.png">
+        <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
+        
+    
+    
+    
+    
+    <link rel="prev" href="../funcionamiento_de_la_app_movil/README.html" />
+    
+
+        
+    </head>
+    <body>
+        
+        
+<link rel="stylesheet" href="../gitbook/style.css">
+
+
+        
+    <div class="book"  data-level="3" data-basepath=".." data-revision="1435692898313">
+    
+
+<div class="book-summary">
+    <div class="book-search">
+        <input type="text" placeholder="Type to search" class="form-control" />
+    </div>
+    <ul class="summary">
+        
+    	
+    	
+    	
+
+        
+
+        
+    
+        
+        <li class="chapter " data-level="0" data-path="index.html">
+            
+                
+                    <a href="../index.html">
+                        <i class="fa fa-check"></i>
+                        
+                         Introducción
+                    </a>
+                
+            
+            
+        </li>
+    
+        
+        <li class="chapter " data-level="1" data-path="fucionamiento_general_del_sistema/README.html">
+            
+                
+                    <a href="../fucionamiento_general_del_sistema/README.html">
+                        <i class="fa fa-check"></i>
+                        
+                            <b>1.</b>
+                        
+                         Fucionamiento general del sistema
+                    </a>
+                
+            
+            
+        </li>
+    
+        
+        <li class="chapter " data-level="2" data-path="funcionamiento_de_la_app_movil/README.html">
+            
+                
+                    <a href="../funcionamiento_de_la_app_movil/README.html">
+                        <i class="fa fa-check"></i>
+                        
+                            <b>2.</b>
+                        
+                         Funcionamiento de la app móvil
+                    </a>
+                
+            
+            
+        </li>
+    
+        
+        <li class="chapter active" data-level="3" data-path="funcionamiento_del_servidor/README.html">
+            
+                
+                    <a href="../funcionamiento_del_servidor/README.html">
+                        <i class="fa fa-check"></i>
+                        
+                            <b>3.</b>
+                        
+                         Funcionamiento del servidor
+                    </a>
+                
+            
+            
+        </li>
+    
+
+
+        
+        <li class="divider"></li>
+        <li>
+            <a href="http://www.gitbook.io/" target="blank" class="gitbook-link">Published using GitBook</a>
+        </li>
+        
+    </ul>
+</div>
+
+    <div class="book-body">
+        <div class="body-inner">
+            <div class="book-header">
+    <!-- Actions Left -->
+    <a href="#" class="btn pull-left toggle-summary" aria-label="Toggle summary"><i class="fa fa-align-justify"></i></a>
+    <a href="#" class="btn pull-left toggle-search" aria-label="Toggle search"><i class="fa fa-search"></i></a>
+    
+    <div id="font-settings-wrapper" class="dropdown pull-left">
+        <a href="#" class="btn toggle-dropdown" aria-label="Toggle font settings"><i class="fa fa-font"></i>
+        </a>
+        <div class="dropdown-menu font-settings">
+    <div class="dropdown-caret">
+        <span class="caret-outer"></span>
+        <span class="caret-inner"></span>
+    </div>
+
+    <div class="buttons">
+        <button type="button" id="reduce-font-size" class="button size-2">A</button>
+        <button type="button" id="enlarge-font-size" class="button size-2">A</button>
+    </div>
+
+    <div class="buttons font-family-list">
+        <button type="button" data-font="0" class="button">Serif</button>
+        <button type="button" data-font="1" class="button">Sans</button>
+    </div>
+
+    <div class="buttons color-theme-list">
+        <button type="button" id="color-theme-preview-0" class="button size-3" data-theme="0">White</button>
+        <button type="button" id="color-theme-preview-1" class="button size-3" data-theme="1">Sepia</button>
+        <button type="button" id="color-theme-preview-2" class="button size-3" data-theme="2">Night</button>
+    </div>
+</div>
+
+    </div>
+
+    <!-- Actions Right -->
+    
+    <div class="dropdown pull-right">
+        <a href="#" class="btn toggle-dropdown" aria-label="Toggle share dropdown"><i class="fa fa-share-alt"></i>
+        </a>
+        <div class="dropdown-menu font-settings dropdown-left">
+            <div class="dropdown-caret">
+                <span class="caret-outer"></span>
+                <span class="caret-inner"></span>
+            </div>
+            <div class="buttons">
+                <button type="button" data-sharing="twitter" class="button">Twitter</button>
+                <button type="button" data-sharing="google-plus" class="button">Google</button>
+                <button type="button" data-sharing="facebook" class="button">Facebook</button>
+                <button type="button" data-sharing="weibo" class="button">Weibo</button>
+                <button type="button" data-sharing="instapaper" class="button">Instapaper</button>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    <a href="#" target="_blank" class="btn pull-right google-plus-sharing-link sharing-link" data-sharing="google-plus" aria-label="Share on Google Plus"><i class="fa fa-google-plus"></i></a>
+    
+    
+    <a href="#" target="_blank" class="btn pull-right facebook-sharing-link sharing-link" data-sharing="facebook" aria-label="Share on Facebook"><i class="fa fa-facebook"></i></a>
+    
+    
+    <a href="#" target="_blank" class="btn pull-right twitter-sharing-link sharing-link" data-sharing="twitter" aria-label="Share on Twitter"><i class="fa fa-twitter"></i></a>
+    
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="../" >Introducción</a>
+    </h1>
+</div>
+
+            <div class="page-wrapper" tabindex="-1">
+                <div class="page-inner">
+                
+                
+                    <section class="normal" id="section-gitbook_6530">
+                    
+                        <h1 id="funcionamiento-del-servidor">Funcionamiento del servidor</h1>
+<p>El servidor consta de varios componentes:</p>
+<ul>
+<li>Archivo <code>server.py</code>: es el servidor propiamente dicho, recibe las peticiones y el video de los dispositivos de grabación e iniciliza al resto de componentes.</li>
+<li>Instancia única de FFServer: al iniciar el servidor, se crea esta instancia del proceso <code>ffserver</code> con la configuración del archivo <code>ffserver.conf</code> de la misma carpeta.</li>
+<li>Múltiples instancias de FFMPEG: con cada nueva conexión de un feed se crea una instancia de FFMPEG para configurar el video.</li>
+</ul>
+<h2 id="servidor">Servidor</h2>
+<p>Al inicializarse, crea:</p>
+<ul>
+<li>Un servidor HTTP multihilo para responder a las peticiones de los dispositivos de grabación. Cada petición se atenderá en un hilo aparte.</li>
+<li>La instancia única del proceso FFServer.</li>
+</ul>
+<p>Cuando le llega una nueva conexión, el servidor comprueba que no se esté emitiendo ya a dicho feed y asigna el nombre del feed a un nuevo proceso FFMPEG creado.</p>
+<p>Este proceso se encargará de convertir los datos de video que se le pasen al formato FFM que necesita FFServer y se le enviará a dicho proceso para que lo sirva.</p>
+<p>A su vez, se inicia un bucle en el que se leen los chunks de video que se van subiendo en la petición POST chunked. Los datos tienen la siguiente forma:</p>
+<pre><code>---- CHUNK ----
+480\r\n
+........................
+\r\n
+
+---- CHUNK ----
+736\r\n
+........................
+\r\n
+</code></pre><ul>
+<li>Una &quot;cabecera&quot; que contiene el tamaño del payload de video y un salto de línea de sistemas Windows (retorno de carro y salto de línea) <code>\r\n</code>.</li>
+<li>El payload.</li>
+<li>Otro salto de línea con retorno de carro para indicar el fin del payload y el inicio de un nuevo chunk.</li>
+</ul>
+<p>El proceso por tanto es:</p>
+<ol>
+<li>Se lee el chunk de datos MPEG-TS en el server.py.</li>
+<li>Se le pasa a la instancia de FFMPEG asignada mediante un socket efímero TCP.</li>
+<li>FFMPEG convierte de MPEG-TS a FFM.</li>
+<li>FFMPEG envía los datos convertidos a FFServer mediante HTTP.</li>
+<li>FFServer recibe los datos y los convierte a sus respectivos formatos de streaming.</li>
+<li>Al conectarse un cliente a un stream, se le envían los datos de video correctamente formateados mediante HTTP.</li>
+</ol>
+<h2 id="posibles-problemas-y-mejoras">Posibles problemas y mejoras</h2>
+<ul>
+<li>El tener que usar un socket TCP para cada conexión <code>server.py</code> -&gt; FFMPEG hace que se desperdicien puertos en la máquina. Aunque es probable que dada una cantidad muy alta de clientes la máquina servidora se quede antes sin ancho de banda o capacidad de procesamiento que sin puertos, es un factor a tener en cuenta.</li>
+<li>FFServer es estático. Hay que conocer de antes los feeds y configurar los streams. Sería interesante poder crear feeds sobre la marcha con configuraciones de stream genéricas, pero no parece estar soportado.</li>
+<li>El demuxing de MPEG-TS y posterior muxing a FFM consume tiempo y recursos, aumentando el delay y restringiendo la cantidad de feeds y streams que puede gestionar una máquina.</li>
+</ul>
+
+                    
+                    </section>
+                
+                
+                </div>
+            </div>
+        </div>
+
+        
+        <a href="../funcionamiento_de_la_app_movil/README.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page: Funcionamiento de la app móvil"><i class="fa fa-angle-left"></i></a>
+        
+        
+    </div>
+</div>
+
+        
+<script src="../gitbook/app.js"></script>
+
+    
+    <script src="https://cdn.mathjax.org/mathjax/2.4-latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+
+    
+    <script src="../gitbook/plugins/gitbook-plugin-mathjax/plugin.js"></script>
+    
+
+<script>
+require(["gitbook"], function(gitbook) {
+    var config = {"fontSettings":{"theme":null,"family":"sans","size":2}};
+    gitbook.start(config);
+});
+</script>
+
+        
+    </body>
+    
+</html>
